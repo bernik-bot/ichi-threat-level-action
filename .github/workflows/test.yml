@@ -1,0 +1,91 @@
+name: self-test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Live fetch (defaults)
+        id: live
+        uses: ./
+
+      - name: Check live outputs
+        env:
+          SCORE: ${{ steps.live.outputs.score }}
+          BAND: ${{ steps.live.outputs.band }}
+          EVALUATED_AT: ${{ steps.live.outputs.evaluated_at }}
+          AVAILABLE: ${{ steps.live.outputs.available }}
+        run: |
+          echo "score=$SCORE band=$BAND evaluated_at=$EVALUATED_AT available=$AVAILABLE"
+          if [ "$AVAILABLE" != "true" ]; then
+            echo "::warning::ICHI API unreachable from runner; live assertions skipped"
+            exit 0
+          fi
+          case "$BAND" in NORMAL|GUARDED|ELEVATED|HIGH|CRITICAL) ;; *) echo "bad band '$BAND'"; exit 1 ;; esac
+          awk -v s="$SCORE" 'BEGIN { exit !(s >= 0 && s <= 100) }' || { echo "bad score '$SCORE'"; exit 1; }
+          [ -n "$EVALUATED_AT" ] || { echo "missing evaluated_at"; exit 1; }
+
+      - name: Threshold NORMAL in warn mode (always met, must not fail)
+        id: warn
+        uses: ./
+        with:
+          fail-on-band: NORMAL
+          mode: warn
+
+      - name: Threshold NORMAL in fail mode (must fail when available)
+        id: failmode
+        continue-on-error: true
+        uses: ./
+        with:
+          fail-on-band: NORMAL
+          mode: fail
+
+      - name: Unreachable endpoint (must degrade, not fail)
+        id: down
+        uses: ./
+        with:
+          api-url: https://ichi.invalid/api/current-index
+          timeout-seconds: "5"
+
+      - name: Unreachable endpoint with strict (must fail)
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          api-url: https://ichi.invalid/api/current-index
+          timeout-seconds: "5"
+          strict: "true"
+
+      - name: Assert behaviours
+        env:
+          LIVE_OK: ${{ steps.live.outputs.available }}
+          WARN_MET: ${{ steps.warn.outputs.threshold_met }}
+          FAIL_OUTCOME: ${{ steps.failmode.outcome }}
+          DOWN_OUTCOME: ${{ steps.down.outcome }}
+          DOWN_AVAILABLE: ${{ steps.down.outputs.available }}
+          DOWN_SCORE: ${{ steps.down.outputs.score }}
+          STRICT_OUTCOME: ${{ steps.strict.outcome }}
+        run: |
+          set -e
+          [ "$DOWN_OUTCOME" = "success" ] || { echo "degrade step should succeed"; exit 1; }
+          [ "$DOWN_AVAILABLE" = "false" ] || { echo "degrade available should be false"; exit 1; }
+          [ -z "$DOWN_SCORE" ] || { echo "degrade score should be empty"; exit 1; }
+          [ "$STRICT_OUTCOME" = "failure" ] || { echo "strict step should fail"; exit 1; }
+          if [ "$LIVE_OK" = "true" ]; then
+            [ "$WARN_MET" = "true" ] || { echo "NORMAL threshold should be met"; exit 1; }
+            [ "$FAIL_OUTCOME" = "failure" ] || { echo "fail mode should fail"; exit 1; }
+          fi
+          echo "all assertions passed"

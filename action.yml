@@ -1,0 +1,77 @@
+name: ICHI Internet Cyber Health Level
+description: >-
+  Read the current ICHI (Internet Cyber Health Index) score and band from
+  ichi.global, expose them as step outputs, and optionally warn or fail when
+  the ambient band is at or above a threshold. Keyless; no secrets needed.
+author: bernik-bot
+branding:
+  icon: activity
+  color: orange
+
+inputs:
+  fail-on-band:
+    description: >-
+      Optional threshold band: NORMAL, GUARDED, ELEVATED, HIGH or CRITICAL.
+      When the current band is at or above it, the step warns (mode: warn)
+      or fails (mode: fail). Empty (default) disables the check.
+    required: false
+    default: ""
+  mode:
+    description: "What to do when the threshold is met: warn (default) or fail."
+    required: false
+    default: warn
+  strict:
+    description: >-
+      If true, fail the step when the index cannot be fetched or parsed.
+      Default false: emit a warning, leave outputs empty, and continue.
+    required: false
+    default: "false"
+  api-url:
+    description: ICHI current-index endpoint (override only for testing).
+    required: false
+    default: https://ichi.global/api/current-index
+  timeout-seconds:
+    description: Per-request timeout for curl.
+    required: false
+    default: "15"
+  summary:
+    description: Write a short job summary to $GITHUB_STEP_SUMMARY (true/false).
+    required: false
+    default: "true"
+
+outputs:
+  score:
+    description: Current ICHI score (0-100, two decimals). Empty if unavailable.
+    value: ${{ steps.ichi.outputs.score }}
+  band:
+    description: Current band (NORMAL|GUARDED|ELEVATED|HIGH|CRITICAL). Empty if unavailable.
+    value: ${{ steps.ichi.outputs.band }}
+  evaluated_at:
+    description: ISO-8601 time the current evaluation completed. Empty if unavailable.
+    value: ${{ steps.ichi.outputs.evaluated_at }}
+  rounded:
+    description: Integer score as published by ICHI. Empty if unavailable.
+    value: ${{ steps.ichi.outputs.rounded }}
+  headline_state:
+    description: ICHI headline state (e.g. LIVE). Empty if unavailable.
+    value: ${{ steps.ichi.outputs.headline_state }}
+  threshold_met:
+    description: "'true' if fail-on-band was set and the current band is at or above it, else 'false'."
+    value: ${{ steps.ichi.outputs.threshold_met }}
+  available:
+    description: "'true' if the index was fetched and parsed, else 'false'."
+    value: ${{ steps.ichi.outputs.available }}
+
+runs:
+  using: composite
+  steps:
+    - id: ichi
+      shell: bash
+      env:
+        ICHI_FAIL_ON_BAND: ${{ inputs.fail-on-band }}
+        ICHI_MODE: ${{ inputs.mode }}
+        ICHI_STRICT: ${{ inputs.strict }}
+        ICHI_API_URL: ${{ inputs.api-url }}
+        ICHI_TIMEOUT: ${{ inputs.timeout-seconds }}
+        ICHI_SUMMARY: ${{ inputs.summary }}
+      run: bash "${{ github.action_path }}/ichi.sh"
