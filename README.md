@@ -1,5 +1,7 @@
 # ICHI Internet Cyber Health Level — GitHub Action
 
+[![Follow @ICHI_Global on X](https://img.shields.io/badge/follow-%40ICHI__Global-000000?logo=x&logoColor=white)](https://x.com/ICHI_Global)
+
 [![Internet cyber health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fichi.global%2Fapi%2Fcurrent-index&query=%24.current.band&label=Internet%20cyber%20health)](https://ichi.global)
 [![self-test](https://github.com/bernik-bot/ichi-threat-level-action/actions/workflows/test.yml/badge.svg)](https://github.com/bernik-bot/ichi-threat-level-action/actions/workflows/test.yml)
 
@@ -112,3 +114,5 @@ The self-test workflow runs on both.
 ## License
 
 MIT
+
+Daily ICHI readings and exploited-vulnerability alerts are posted on X by [@ICHI_Global](https://x.com/ICHI_Global) (automated, run by ICHI's creator).
